@@ -1,0 +1,16 @@
+tkinter
+serial
+threading
+matplotlib
+datetime 
+pandas
+csv
+time
+numpy
+statistics
+sys
+glob
+re
+os.path
+PyQt5
+pyqtgraph
