@@ -1,8 +1,10 @@
 from tkinter import *
 import serial.tools.list_ports
 import threading
+import matplotlib 
 import matplotlib.pyplot as plt
-from matplotlib import style
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from datetime import datetime
 import pandas as pd
@@ -24,6 +26,10 @@ class Interface():
         self.filename = ""
         self.datalist = []
         self.timelist = []
+        self.x = []
+        self.y = []
+        self.step = 0
+        self.plotLength = 100
         self.timeZero = 0.0
         self.port_lable = Label(self.root, text = "Available Port(s): ", bg = "white")
         self.exit_btn = Button(self.root, text = "Exit", height = 2, width = 15, command = self.exit)
@@ -37,6 +43,9 @@ class Interface():
         self.graph = Graphics()
         self.graph.canvas = Canvas(self.root, width = 400, height = 100, bg = "white")
         self.t1 = threading.Thread(target = self.readSerial)
+        self.figure = Figure(figsize=(5,5), dpi = 75)
+        self.subplot = self.figure.add_subplot(111)
+        self.canavas = FigureCanvasTkAgg(self.figure, self.root)
 
        
         
@@ -44,7 +53,7 @@ class Interface():
 
     def connect_menu_init(self):
         self.root.title("Force Sensor Gui")
-        self.root.geometry("700x500")
+        self.root.geometry("600x750")
         self.root.config(bg = "white")
 
         self.port_lable.grid(column = 1, row = 2, pady = 20)
@@ -56,12 +65,16 @@ class Interface():
 
         self.start_btn.grid(column = 2, row = 4, pady = 20)
         self.stop_btn.grid(column = 3, row = 4, pady = 20)
-        self.reset_btn.grid(column= 4, row = 7, pady = 20)
+        self.reset_btn.grid(column= 4, row = 4, pady = 20)
         
         self.graph.canvas.grid(row = 6, columnspan = 5)
         self.graph.text = self.graph.canvas.create_text(200, 50, font=("Helvetica", "10"), text="HELLO", fill = "black")
         
-        
+        #subplot = self.figure.add_subplot(111)
+        self.subplot.plot(self.x,self.y)
+        self.canavas.draw()
+        self.canavas.get_tk_widget().grid(row = 7, columnspan = 5)
+
 
     def run(self):
         self.root.mainloop()
@@ -118,20 +131,36 @@ class Interface():
             if len(data) > 0:
                 self.data_str = data.decode('utf8')
                 self.graph_update()
-                if self.log:
-                    if "Force: " in self.data_str:
+                if "Force: " in self.data_str:
                         val = self.data_str.replace("Force: ","")
-                        self.datalist.append(float(val))
-                        self.timelist.append(time.time_ns()*10**-9 - self.timeZero)
-                        print(val)
-                else:
-                    print(self.data_str)
+                        self.x.append(time.time_ns()*10**-9 - self.timeZero)
+                        self.y.append(float(val))
+                        self.step += 1
+                        if len(self.x) > self.plotLength:
+                            del self.x[0]
+                            del self.y[0] 
+                        if self.step == 5:                  
+                            self.plot_update()
+                            self.step = 0
+                        if self.log:
+                            val = self.data_str.replace("Force: ","")
+                            self.datalist.append(float(val))
+                            self.timelist.append(time.time_ns()*10**-9 - self.timeZero)
+                        
                     
+
                
 
 
     def graph_update(self):
         self.graph.canvas.itemconfig(self.graph.text, text=self.data_str)
+    
+    def plot_update(self):
+        #subplot = self.figure.add_subplot(111)
+        self.subplot.cla()
+        self.subplot.plot(self.x,self.y)
+        self.canavas.draw()
+
 
     def start_logging(self):
         self.log = True
@@ -140,6 +169,7 @@ class Interface():
         name = datetime.now()
         self.timeZero = time.time_ns()*10**-9
         self.filename = name.strftime("%Y%m%d_%H%M")
+        self.step = -10
         
 
     def stop_logging(self):
