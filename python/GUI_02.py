@@ -38,14 +38,18 @@ class Interface():
         self.start_btn = Button(self.root, text = "Start", height = 2, width = 15, fg = "white", bg = "green", state = "disabled", command=self.start_logging)
         self.stop_btn = Button(self.root, text = "Stop", height = 2, width = 15, fg = "white", bg = "red", state = "disabled", command= self.stop_logging)
         self.reset_btn = Button(self.root, text = "Reset", height = 2, width = 15, state = "disabled", command= self.reset)
+        self.newTry_btn = Button(self.root, text = "new Try", height = 2, width = 15, state = "disabled", command= self.newTry)
         self.clicked_com = StringVar()
         self.drop_COM = OptionMenu(self.root, self.clicked_com, ["-"])
         self.graph = Graphics()
         self.graph.canvas = Canvas(self.root, width = 400, height = 100, bg = "white")
         self.t1 = threading.Thread(target = self.readSerial)
+        self.t1.daemon = True
+        self.firstConnection = True
         self.figure = Figure(figsize=(5,5), dpi = 75)
         self.subplot = self.figure.add_subplot(111)
         self.canavas = FigureCanvasTkAgg(self.figure, self.root)
+        self.plotting = True
 
        
         
@@ -53,24 +57,24 @@ class Interface():
 
     def connect_menu_init(self):
         self.root.title("Force Sensor Gui")
-        self.root.geometry("600x750")
+        self.root.geometry("700x750")
         self.root.config(bg = "white")
 
-        self.port_lable.grid(column = 1, row = 2, pady = 20)
+        self.port_lable.grid(column = 2, row = 2, pady = 20)
         self.refresh_btn.grid(column = 4, row = 2)
         self.connect_btn.grid(column = 4, row = 3)
-        self.exit_btn.grid(column=4,row = 8, pady = 20)
+        self.newTry_btn.grid(column = 3, row = 4)
+        self.exit_btn.grid(column=4,row = 5, pady = 20)
 
         self.update_COMS()
 
-        self.start_btn.grid(column = 2, row = 4, pady = 20)
-        self.stop_btn.grid(column = 3, row = 4, pady = 20)
+        self.start_btn.grid(column = 1, row = 4, pady = 20, padx = 20)
+        self.stop_btn.grid(column = 2, row = 4, pady = 20, padx = 20)
         self.reset_btn.grid(column= 4, row = 4, pady = 20)
         
         self.graph.canvas.grid(row = 6, columnspan = 5)
         self.graph.text = self.graph.canvas.create_text(200, 50, font=("Helvetica", "10"), text="HELLO", fill = "black")
         
-        #subplot = self.figure.add_subplot(111)
         self.subplot.plot(self.x,self.y)
         self.canavas.draw()
         self.canavas.get_tk_widget().grid(row = 7, columnspan = 5)
@@ -121,8 +125,11 @@ class Interface():
                 self.ser = serial.Serial(self.port, self.baud)
             except:
                 pass
-            
+        
+        if self.firstConnection:
             self.t1.start()
+            self.firstConnection = False
+            
             
 
     def readSerial(self):
@@ -139,8 +146,9 @@ class Interface():
                         if len(self.x) > self.plotLength:
                             del self.x[0]
                             del self.y[0] 
-                        if self.step == 5:                  
-                            self.plot_update()
+                        if self.step == 5:
+                            if self.plotting:                  
+                                self.plot_update()
                             self.step = 0
                         if self.log:
                             val = self.data_str.replace("Force: ","")
@@ -156,13 +164,13 @@ class Interface():
         self.graph.canvas.itemconfig(self.graph.text, text=self.data_str)
     
     def plot_update(self):
-        #subplot = self.figure.add_subplot(111)
         self.subplot.cla()
         self.subplot.plot(self.x,self.y)
         self.canavas.draw()
 
 
     def start_logging(self):
+        self.subplot.cla()
         self.log = True
         self.stop_btn["state"] = "active"
         self.start_btn["state"] = "disable"
@@ -176,12 +184,11 @@ class Interface():
         self.log = False
         self.start_btn["state"] = "active"
         self.stop_btn["state"] = "disable"
-        #df = pd.DataFrame(self.datalist)
         df = pd.DataFrame(list(zip(self.timelist, self.datalist)), columns = ["Time [s]", "Force"])
         df.to_csv("logging/"+ self.filename + ".csv", sep=',',index=False)
-        print_plot("logging/" + self.filename + ".csv")
-        self.datalist = []
-        self.timelist = []
+        self.print_plot()
+        #self.datalist = []
+        #self.timelist = []
 
     def reset(self):
         self.ser.write(b'RESET')
@@ -190,15 +197,26 @@ class Interface():
         serialData = False
         self.root.destroy()
 
+    def print_plot(self):
+        self.newTry_btn["state"] = "active"
+        self.plotting = False
+        self.subplot.cla()
+        self.subplot.plot(self.timelist,self.datalist)
+        self.canavas.draw()
+
+    def newTry(self):
+        self.datalist = []
+        self.timelist = []
+        self.plotting = True
+        self.newTry_btn["state"] = "disable"
+
+
 
 class Graphics():
     pass
 
 
-def print_plot(filename):
-    df = pd.read_csv (filename)
-    df.plot(x = "Time [s]", y = "Force")
-    plt.show()
+
 
 
 
